@@ -1,12 +1,20 @@
-import { eq, and, gte, inArray } from "drizzle-orm";
+import { eq, and, gte, inArray, sql } from "drizzle-orm";
 import { db } from "~/db";
-import { courses, purchases, enrollments, courseRatings } from "~/db/schema";
+import {
+  purchases,
+  enrollments,
+  courseRatings,
+  courses,
+  users,
+} from "~/db/schema";
 
 // ─── Analytics Service ───
 // Encapsulates all database query logic for the instructor analytics dashboard.
 // Single primary function behind a clean interface; all aggregation happens here.
 
 export type AnalyticsPeriod = "7d" | "30d" | "12mo" | "all";
+
+export type TimePeriod = AnalyticsPeriod;
 
 export type CourseAnalytics = {
   courseId: number;
@@ -39,6 +47,10 @@ function getPeriodStartIso(period: AnalyticsPeriod, now: Date): string | null {
   else if (period === "30d") d.setDate(d.getDate() - 30);
   else if (period === "12mo") d.setMonth(d.getMonth() - 12);
   return d.toISOString();
+}
+
+function getStartDate(period: TimePeriod): string | null {
+  return getPeriodStartIso(period, new Date());
 }
 
 function isMonthlyGranularity(period: AnalyticsPeriod): boolean {
@@ -221,5 +233,58 @@ export function getInstructorAnalytics(
     summary: { totalRevenue, totalEnrollments, avgRating, ratingCount },
     timeSeries,
     courses: courseBreakdown,
+  };
+}
+
+// ─── Admin (Platform-Wide) Analytics ───
+
+export interface AdminAnalyticsSummary {
+  totalRevenue: number;
+  totalEnrollments: number;
+  topEarningCourse: { title: string; revenue: number } | null;
+}
+
+export function getAdminAnalyticsSummary(opts: {
+  period: TimePeriod;
+}): AdminAnalyticsSummary {
+  const { period } = opts;
+  const startDate = getStartDate(period);
+
+  // Total revenue
+  const revenueResult = db
+    .select({ total: sql<number>`coalesce(sum(${purchases.pricePaid}), 0)` })
+    .from(purchases)
+    .where(startDate ? sql`${purchases.createdAt} >= ${startDate}` : sql`1=1`)
+    .get();
+
+  // Total enrollments
+  const enrollmentResult = db
+    .select({ count: sql<number>`count(*)` })
+    .from(enrollments)
+    .where(
+      startDate ? sql`${enrollments.enrolledAt} >= ${startDate}` : sql`1=1`
+    )
+    .get();
+
+  // Top earning course
+  const topCourseResult = db
+    .select({
+      title: courses.title,
+      revenue: sql<number>`coalesce(sum(${purchases.pricePaid}), 0)`,
+    })
+    .from(purchases)
+    .innerJoin(courses, eq(purchases.courseId, courses.id))
+    .where(startDate ? sql`${purchases.createdAt} >= ${startDate}` : sql`1=1`)
+    .groupBy(courses.id)
+    .orderBy(sql`sum(${purchases.pricePaid}) DESC`)
+    .limit(1)
+    .get();
+
+  return {
+    totalRevenue: revenueResult?.total ?? 0,
+    totalEnrollments: enrollmentResult?.count ?? 0,
+    topEarningCourse: topCourseResult
+      ? { title: topCourseResult.title, revenue: topCourseResult.revenue }
+      : null,
   };
 }

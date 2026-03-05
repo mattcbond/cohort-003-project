@@ -11,7 +11,7 @@ vi.mock("~/db", () => ({
   },
 }));
 
-import { getInstructorAnalytics } from "./analyticsService";
+import { getInstructorAnalytics, getAdminAnalyticsSummary } from "./analyticsService";
 
 // Fixed "now" used across all tests for deterministic period calculations.
 // now = 2026-04-15T12:00:00.000Z
@@ -625,6 +625,183 @@ describe("analyticsService", () => {
 
       const apr10 = result.timeSeries.find((p) => p.date === "2026-04-10");
       expect(apr10?.revenue).toBe(3000);
+    });
+  });
+
+  // ─── Admin Analytics Summary ───
+
+  describe("getAdminAnalyticsSummary", () => {
+    it("returns zeros and null top course when no data exists", () => {
+      const result = getAdminAnalyticsSummary({ period: "all" });
+
+      expect(result.totalRevenue).toBe(0);
+      expect(result.totalEnrollments).toBe(0);
+      expect(result.topEarningCourse).toBeNull();
+    });
+
+    it("returns total revenue across all instructors", () => {
+      const otherInstructor = testDb
+        .insert(schema.users)
+        .values({
+          name: "Other Instructor",
+          email: "other@example.com",
+          role: schema.UserRole.Instructor,
+        })
+        .returning()
+        .get();
+
+      const otherCourse = testDb
+        .insert(schema.courses)
+        .values({
+          title: "Other Course",
+          slug: "other-course",
+          description: "Another course",
+          instructorId: otherInstructor.id,
+          categoryId: base.category.id,
+          status: schema.CourseStatus.Published,
+          price: 2999,
+        })
+        .returning()
+        .get();
+
+      testDb
+        .insert(schema.purchases)
+        .values([
+          {
+            userId: base.user.id,
+            courseId: base.course.id,
+            pricePaid: 4999,
+            country: "US",
+          },
+          {
+            userId: base.user.id,
+            courseId: otherCourse.id,
+            pricePaid: 2999,
+            country: "US",
+          },
+        ])
+        .run();
+
+      const result = getAdminAnalyticsSummary({ period: "all" });
+
+      expect(result.totalRevenue).toBe(7998);
+    });
+
+    it("returns total enrollments across all courses", () => {
+      testDb
+        .insert(schema.enrollments)
+        .values([
+          { userId: base.user.id, courseId: base.course.id },
+          { userId: base.instructor.id, courseId: base.course.id },
+        ])
+        .run();
+
+      const result = getAdminAnalyticsSummary({ period: "all" });
+
+      expect(result.totalEnrollments).toBe(2);
+    });
+
+    it("returns the top earning course", () => {
+      const otherInstructor = testDb
+        .insert(schema.users)
+        .values({
+          name: "Other Instructor",
+          email: "other@example.com",
+          role: schema.UserRole.Instructor,
+        })
+        .returning()
+        .get();
+
+      const otherCourse = testDb
+        .insert(schema.courses)
+        .values({
+          title: "Expensive Course",
+          slug: "expensive-course",
+          description: "Pricey",
+          instructorId: otherInstructor.id,
+          categoryId: base.category.id,
+          status: schema.CourseStatus.Published,
+          price: 9999,
+        })
+        .returning()
+        .get();
+
+      testDb
+        .insert(schema.purchases)
+        .values([
+          {
+            userId: base.user.id,
+            courseId: base.course.id,
+            pricePaid: 4999,
+            country: "US",
+          },
+          {
+            userId: base.user.id,
+            courseId: otherCourse.id,
+            pricePaid: 9999,
+            country: "US",
+          },
+        ])
+        .run();
+
+      const result = getAdminAnalyticsSummary({ period: "all" });
+
+      expect(result.topEarningCourse).toEqual({
+        title: "Expensive Course",
+        revenue: 9999,
+      });
+    });
+
+    it("filters by time period", () => {
+      const now = new Date();
+      const threeDaysAgo = new Date(now);
+      threeDaysAgo.setDate(now.getDate() - 3);
+      const tenDaysAgo = new Date(now);
+      tenDaysAgo.setDate(now.getDate() - 10);
+
+      testDb
+        .insert(schema.purchases)
+        .values([
+          {
+            userId: base.user.id,
+            courseId: base.course.id,
+            pricePaid: 4999,
+            country: "US",
+            createdAt: threeDaysAgo.toISOString(),
+          },
+          {
+            userId: base.instructor.id,
+            courseId: base.course.id,
+            pricePaid: 2500,
+            country: "US",
+            createdAt: tenDaysAgo.toISOString(),
+          },
+        ])
+        .run();
+
+      const result = getAdminAnalyticsSummary({ period: "7d" });
+
+      expect(result.totalRevenue).toBe(4999);
+    });
+
+    it("returns null top course when no purchases in period", () => {
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+
+      testDb
+        .insert(schema.purchases)
+        .values({
+          userId: base.user.id,
+          courseId: base.course.id,
+          pricePaid: 4999,
+          country: "US",
+          createdAt: twoYearsAgo.toISOString(),
+        })
+        .run();
+
+      const result = getAdminAnalyticsSummary({ period: "7d" });
+
+      expect(result.topEarningCourse).toBeNull();
     });
   });
 });
