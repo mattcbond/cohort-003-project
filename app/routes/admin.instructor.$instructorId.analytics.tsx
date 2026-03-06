@@ -16,7 +16,7 @@ function parsePeriod(raw: string | null): AnalyticsPeriod {
   if (raw && VALID_PERIODS.has(raw as AnalyticsPeriod)) {
     return raw as AnalyticsPeriod;
   }
-  return "30d";
+  return "12mo";
 }
 
 export function meta({ data: loaderData }: Route.MetaArgs) {

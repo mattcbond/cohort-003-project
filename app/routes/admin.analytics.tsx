@@ -91,10 +91,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const url = new URL(request.url);
-  const periodParam = url.searchParams.get("period") ?? "30d";
+  const periodParam = url.searchParams.get("period") ?? "12mo";
   const period: TimePeriod = VALID_PERIODS.includes(periodParam as TimePeriod)
     ? (periodParam as TimePeriod)
-    : "30d";
+    : "12mo";
 
   const instructorParam = url.searchParams.get("instructor");
   const instructorId = instructorParam ? Number(instructorParam) : undefined;
@@ -103,7 +103,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const timeSeries = getAdminRevenueTimeSeries({ period });
   const courseBreakdown = getAdminPerCourseBreakdown({
     period,
-    instructorId: instructorId && !isNaN(instructorId) ? instructorId : undefined,
+    instructorId:
+      instructorId && !isNaN(instructorId) ? instructorId : undefined,
   });
   const instructors = getInstructorsWithCourses();
 
@@ -113,7 +114,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     courseBreakdown,
     instructors,
     period,
-    selectedInstructorId: instructorId && !isNaN(instructorId) ? instructorId : null,
+    selectedInstructorId:
+      instructorId && !isNaN(instructorId) ? instructorId : null,
   };
 }
 
