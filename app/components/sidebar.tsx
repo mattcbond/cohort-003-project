@@ -17,6 +17,7 @@ import {
   Settings,
   BarChart2,
   BarChart3,
+  Star,
   Flame,
 } from "lucide-react";
 import { NotificationBell } from "~/components/notification-bell";
@@ -47,11 +48,11 @@ interface NotificationItem {
   createdAt: string;
 }
 
-interface GamificationStats {
-  totalXp: number;
+interface GamificationData {
   level: number;
   currentLevelXp: number;
-  nextLevelXp: number;
+  xpForNextLevel: number;
+  totalXp: number;
   currentStreak: number;
   longestStreak: number;
 }
@@ -62,7 +63,7 @@ interface SidebarProps {
   isTeamAdmin?: boolean;
   notifications?: NotificationItem[];
   notificationUnreadCount?: number;
-  gamificationStats?: GamificationStats | null;
+  gamification?: GamificationData | null;
 }
 
 interface NavItem {
@@ -135,7 +136,7 @@ export function Sidebar({
   isTeamAdmin = false,
   notifications = [],
   notificationUnreadCount = 0,
-  gamificationStats = null,
+  gamification = null,
 }: SidebarProps) {
   const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
@@ -205,6 +206,49 @@ export function Sidebar({
         )}
       </nav>
 
+      {gamification && currentUser?.role === UserRole.Student && (
+        <div className="border-t border-sidebar-border p-3">
+          <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+            Progress
+          </div>
+          <div className="space-y-2 px-3">
+            <div className="flex items-center gap-2">
+              <Star className="size-4 text-yellow-500" />
+              <span className="text-sm font-medium">
+                Level {gamification.level}
+              </span>
+              <span className="ml-auto text-xs text-sidebar-foreground/50">
+                {gamification.totalXp} XP
+              </span>
+            </div>
+            <div className="space-y-1">
+              <div className="h-2 rounded-full bg-sidebar-accent">
+                <div
+                  className="h-2 rounded-full bg-yellow-500 transition-all"
+                  style={{
+                    width: `${gamification.xpForNextLevel > 0 ? (gamification.currentLevelXp / gamification.xpForNextLevel) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="text-xs text-sidebar-foreground/50">
+                {gamification.currentLevelXp} / {gamification.xpForNextLevel} XP
+                to next level
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Flame className="size-4 text-orange-500" />
+              <span className="text-sm font-medium">
+                {gamification.currentStreak} day
+                {gamification.currentStreak !== 1 ? "s" : ""}
+              </span>
+              <span className="ml-auto text-xs text-sidebar-foreground/50">
+                Best: {gamification.longestStreak}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {recentCourses.length > 0 && (
         <div className="border-t border-sidebar-border p-3">
           <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
@@ -240,40 +284,6 @@ export function Sidebar({
                 </div>
               </NavLink>
             ))}
-          </div>
-        </div>
-      )}
-
-      {gamificationStats && currentUser?.role === UserRole.Student && (
-        <div className="border-t border-sidebar-border p-3 space-y-3">
-          <div className="px-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
-                Level {gamificationStats.level}
-              </span>
-              <span className="text-xs text-sidebar-foreground/50">
-                {gamificationStats.currentLevelXp} / {gamificationStats.nextLevelXp} XP
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-sidebar-accent">
-              <div
-                className="h-1.5 rounded-full bg-primary transition-all"
-                style={{
-                  width: `${Math.min(100, Math.round((gamificationStats.currentLevelXp / gamificationStats.nextLevelXp) * 100))}%`,
-                }}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 px-3">
-            <Flame className="size-4 text-orange-500 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium">
-                {gamificationStats.currentStreak} day streak
-              </span>
-              <div className="text-xs text-sidebar-foreground/50">
-                Best: {gamificationStats.longestStreak} days
-              </div>
-            </div>
           </div>
         </div>
       )}

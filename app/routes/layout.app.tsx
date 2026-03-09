@@ -17,8 +17,10 @@ import {
   getNotifications,
   getUnreadCount,
 } from "~/services/notificationService";
-import { getGamificationStats } from "~/services/gamificationService";
 import { UserRole } from "~/db/schema";
+import { getTotalXp } from "~/services/xpService";
+import { getLevelFromXp } from "~/lib/leveling";
+import { getStreakData } from "~/services/streakService";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const users = getAllUsers();
@@ -52,9 +54,16 @@ export async function loader({ request }: Route.LoaderArgs) {
       })
     : [];
 
-  const gamificationStats = currentUserId
-    ? getGamificationStats(currentUserId)
-    : null;
+  const isStudent = currentUser?.role === UserRole.Student;
+  const gamification =
+    isStudent && currentUserId
+      ? (() => {
+          const totalXp = getTotalXp(currentUserId);
+          const levelInfo = getLevelFromXp(totalXp);
+          const streak = getStreakData(currentUserId);
+          return { ...levelInfo, totalXp, ...streak };
+        })()
+      : null;
 
   const isInstructor = currentUser?.role === UserRole.Instructor;
   const userIsTeamAdmin = currentUserId ? isTeamAdmin(currentUserId) : false;
@@ -83,7 +92,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     isTeamAdmin: userIsTeamAdmin,
     notifications,
     notificationUnreadCount,
-    gamificationStats,
+    gamification,
   };
 }
 
@@ -98,7 +107,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     isTeamAdmin: userIsTeamAdmin,
     notifications,
     notificationUnreadCount,
-    gamificationStats,
+    gamification,
   } = loaderData;
 
   return (
@@ -109,7 +118,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
         isTeamAdmin={userIsTeamAdmin}
         notifications={notifications}
         notificationUnreadCount={notificationUnreadCount}
-        gamificationStats={gamificationStats}
+        gamification={gamification}
       />
       <main className="flex-1 overflow-y-auto">
         <Outlet />

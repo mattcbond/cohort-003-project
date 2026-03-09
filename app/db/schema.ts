@@ -3,7 +3,6 @@ import {
   text,
   integer,
   real,
-  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 export enum UserRole {
@@ -325,42 +324,26 @@ export const videoWatchEvents = sqliteTable("video_watch_events", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const xpEvents = sqliteTable(
-  "xp_events",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id),
-    amount: integer("amount").notNull(),
-    sourceType: text("source_type").notNull(),
-    sourceId: integer("source_id").notNull(),
-    createdAt: text("created_at")
-      .notNull()
-      .$defaultFn(() => new Date().toISOString()),
-  },
-  (table) => [
-    uniqueIndex("xp_events_user_source_idx").on(
-      table.userId,
-      table.sourceType,
-      table.sourceId
-    ),
-  ]
-);
+export const xpEvents = sqliteTable("xp_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  amount: integer("amount").notNull(),
+  sourceType: text("source_type").notNull(),
+  sourceId: integer("source_id").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
 
-export const streakActivities = sqliteTable(
-  "streak_activities",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id),
-    utcDate: text("utc_date").notNull(),
-  },
-  (table) => [
-    uniqueIndex("streak_activities_user_date_idx").on(
-      table.userId,
-      table.utcDate
-    ),
-  ]
-);
+export const streakActivities = sqliteTable("streak_activities", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  date: text("date").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});

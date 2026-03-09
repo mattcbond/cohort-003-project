@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "dabc61c7-3013-4ca8-8e17-46ba41b0caad",
-  "prevId": "c593fc69-9ef6-4cee-8ee8-a8f83234d767",
+  "id": "bde6887f-6a8d-429f-9c07-f0aa9b73509c",
+  "prevId": "dabc61c7-3013-4ca8-8e17-46ba41b0caad",
   "tables": {
     "categories": {
       "name": "categories",
@@ -1170,6 +1170,54 @@
           "tableFrom": "quizzes",
           "tableTo": "lessons",
           "columnsFrom": ["lesson_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "streak_activities": {
+      "name": "streak_activities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "streak_activities_user_id_users_id_fk": {
+          "name": "streak_activities_user_id_users_id_fk",
+          "tableFrom": "streak_activities",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
