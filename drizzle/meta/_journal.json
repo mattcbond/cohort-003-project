@@ -29,6 +29,20 @@
       "when": 1775172273858,
       "tag": "0003_familiar_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1775200000000,
+      "tag": "0004_lesson_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1775200000001,
+      "tag": "0005_lesson_comments_soft_delete",
+      "breakpoints": true
     }
   ]
 }

@@ -34,6 +34,12 @@ import {
   moveLessonToModule,
 } from "~/services/lessonService";
 import { getEnrollmentCountForCourse, getCourseEnrolledStudents } from "~/services/enrollmentService";
+import {
+  getAllLessonCommentsForCourse,
+  getCommentById,
+  deleteComment,
+  setCommentHidden,
+} from "~/services/lessonCommentService";
 import { calculateProgress } from "~/services/progressService";
 import { getQuizByLessonId, getBestAttempt } from "~/services/quizService";
 import { getCurrentUserId } from "~/lib/session";
@@ -41,6 +47,7 @@ import { getUserById } from "~/services/userService";
 import { CourseStatus, UserRole } from "~/db/schema";
 import { formatDuration, formatPrice } from "~/lib/utils";
 import { MonacoMarkdownEditor } from "~/components/monaco-markdown-editor";
+import { UserAvatar } from "~/components/user-avatar";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -57,8 +64,10 @@ import {
   BookOpen,
   Clock,
   Eye,
+  EyeOff,
   FileEdit,
   GripVertical,
+  MessageSquare,
   Pencil,
   Plus,
   Save,
@@ -94,6 +103,9 @@ const courseEditorActionSchema = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("move-lesson"), lessonId: z.coerce.number().int(), targetModuleId: z.coerce.number().int(), targetPosition: z.coerce.number().int() }),
   z.object({ intent: z.literal("delete-lesson"), lessonId: z.coerce.number().int() }),
   z.object({ intent: z.literal("update-sales-copy"), salesCopy: z.string().optional() }),
+  z.object({ intent: z.literal("hide-comment"), commentId: z.coerce.number().int() }),
+  z.object({ intent: z.literal("show-comment"), commentId: z.coerce.number().int() }),
+  z.object({ intent: z.literal("delete-comment"), commentId: z.coerce.number().int() }),
 ]);
 
 export function meta({ data: loaderData }: Route.MetaArgs) {
@@ -185,7 +197,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const quizCount = lessonQuizzes.length;
 
-  return { course, lessonCount, enrollmentCount, students, quizCount };
+  const courseComments = getAllLessonCommentsForCourse(courseId);
+
+  return { course, lessonCount, enrollmentCount, students, quizCount, courseComments };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -355,6 +369,24 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (intent === "update-sales-copy") {
     updateCourseSalesCopy(courseId, parsed.data.salesCopy || null);
     return { success: true, field: "sales-copy" };
+  }
+
+  if (intent === "hide-comment" || intent === "show-comment") {
+    const comment = getCommentById(parsed.data.commentId);
+    if (!comment) {
+      throw data("Comment not found.", { status: 404 });
+    }
+    setCommentHidden(parsed.data.commentId, intent === "hide-comment");
+    return { success: true, field: "comment-moderation" };
+  }
+
+  if (intent === "delete-comment") {
+    const comment = getCommentById(parsed.data.commentId);
+    if (!comment) {
+      throw data("Comment not found.", { status: 404 });
+    }
+    deleteComment(parsed.data.commentId);
+    return { success: true, field: "comment-delete" };
   }
 
   throw data("Invalid action.", { status: 400 });
@@ -984,7 +1016,7 @@ function statusBadgeColor(status: string) {
 export default function InstructorCourseEditor({
   loaderData,
 }: Route.ComponentProps) {
-  const { course, lessonCount, enrollmentCount, students, quizCount } = loaderData;
+  const { course, lessonCount, enrollmentCount, students, quizCount, courseComments } = loaderData;
   const statusFetcher = useFetcher();
   const reorderFetcher = useFetcher();
   const lessonReorderFetcher = useFetcher();
@@ -1192,6 +1224,10 @@ export default function InstructorCourseEditor({
           <TabsTrigger value="students">
             <Users className="size-4" />
             Students
+          </TabsTrigger>
+          <TabsTrigger value="comments">
+            <MessageSquare className="size-4" />
+            Comments
           </TabsTrigger>
         </TabsList>
 
@@ -1652,7 +1688,124 @@ export default function InstructorCourseEditor({
             </Card>
           )}
         </TabsContent>
+
+        {/* Comments Tab */}
+        <TabsContent value="comments" className="mt-6">
+          <div className="mb-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <MessageSquare className="size-4" />
+              {courseComments.length} {courseComments.length === 1 ? "comment" : "comments"} across all lessons
+            </span>
+          </div>
+          {courseComments.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <MessageSquare className="mx-auto mb-3 size-8 text-muted-foreground/50" />
+                <p className="text-muted-foreground">No comments yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {courseComments.map((comment) => (
+                    <CommentModerationRow key={comment.id} comment={comment} courseId={course.id} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+type CourseComment = {
+  id: number;
+  content: string;
+  isHidden: boolean;
+  createdAt: string;
+  lessonId: number;
+  lessonTitle: string;
+  userId: number;
+  userName: string;
+  userAvatarUrl: string | null;
+};
+
+function CommentModerationRow({
+  comment,
+  courseId,
+}: {
+  comment: CourseComment;
+  courseId: number;
+}) {
+  const fetcher = useFetcher();
+
+  return (
+    <div className={`flex gap-3 p-4 ${comment.isHidden ? "opacity-50" : ""}`}>
+      <UserAvatar
+        name={comment.userName}
+        avatarUrl={comment.userAvatarUrl}
+        className="mt-0.5 shrink-0"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">{comment.userName}</span>
+              <span className="text-xs text-muted-foreground">on</span>
+              <span className="text-xs font-medium">{comment.lessonTitle}</span>
+              <span className="text-xs text-muted-foreground">
+                {new Date(comment.createdAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+              {comment.isHidden && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  Hidden
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm whitespace-pre-wrap break-words">
+              {comment.content}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <fetcher.Form method="post" action={`/instructor/${courseId}`}>
+              <input
+                type="hidden"
+                name="intent"
+                value={comment.isHidden ? "show-comment" : "hide-comment"}
+              />
+              <input type="hidden" name="commentId" value={comment.id} />
+              <Button type="submit" variant="outline" size="sm">
+                {comment.isHidden ? (
+                  <>
+                    <Eye className="mr-1 size-3" />
+                    Show
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="mr-1 size-3" />
+                    Hide
+                  </>
+                )}
+              </Button>
+            </fetcher.Form>
+            <fetcher.Form method="post" action={`/instructor/${courseId}`}>
+              <input type="hidden" name="intent" value="delete-comment" />
+              <input type="hidden" name="commentId" value={comment.id} />
+              <Button type="submit" variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Trash2 className="mr-1 size-3" />
+                Delete
+              </Button>
+            </fetcher.Form>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
