@@ -1376,14 +1376,14 @@ function CommentCard({
 
       {/* Delete button */}
       {canDelete && (
-        <fetcher.Form method="post">
+        <fetcher.Form method="post" className="shrink-0 self-start">
           <input type="hidden" name="intent" value="delete-comment" />
           <input type="hidden" name="commentId" value={comment.id} />
           <Button
             type="submit"
             variant="ghost"
             size="sm"
-            className="shrink-0 text-muted-foreground hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive"
             title="Delete comment"
             disabled={isDeleting}
           >
