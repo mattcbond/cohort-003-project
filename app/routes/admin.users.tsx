@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { AlertTriangle, Pencil, Shield, Users } from "lucide-react";
+import { AlertTriangle, BarChart2, Pencil, Shield, Users } from "lucide-react";
 import { data, isRouteErrorResponse, Link } from "react-router";
 
 const adminUserActionSchema = v.variant("intent", [
@@ -298,14 +298,28 @@ function EditableUserRow({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsEditing(true)}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            {user.role === UserRole.Instructor && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                asChild
+              >
+                <Link to={`/admin/instructor/${user.id}/analytics`}>
+                  <BarChart2 className="size-3.5" />
+                </Link>
+              </Button>
+            )}
+          </div>
         )}
       </td>
     </tr>
