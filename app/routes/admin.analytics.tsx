@@ -5,12 +5,22 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import type { Route } from "./+types/admin.analytics";
 import { getCurrentUserId } from "~/lib/session";
 import { getUserById } from "~/services/userService";
 import { UserRole } from "~/db/schema";
 import {
   getAdminAnalyticsSummary,
+  getAdminAnalyticsTimeSeries,
   type TimePeriod,
 } from "~/services/analyticsService";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -24,12 +34,32 @@ import {
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
-const VALID_PERIODS: TimePeriod[] = ["7d", "30d", "12m", "all"];
+// ─── Chart Helpers ───
+
+function formatChartDate(date: string): string {
+  if (date.length === 7) {
+    const [year, month] = date.split("-");
+    const d = new Date(Number(year), Number(month) - 1, 1);
+    return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+  }
+  const d = new Date(date + "T00:00:00Z");
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatChartRevenue(cents: number): string {
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+const VALID_PERIODS: TimePeriod[] = ["7d", "30d", "12mo", "all"];
 
 const PERIODS: { value: TimePeriod; label: string }[] = [
   { value: "7d", label: "7 days" },
   { value: "30d", label: "30 days" },
-  { value: "12m", label: "12 months" },
+  { value: "12mo", label: "12 months" },
   { value: "all", label: "All time" },
 ];
 
@@ -60,12 +90,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     : "30d";
 
   const summary = getAdminAnalyticsSummary({ period });
+  const timeSeries = getAdminAnalyticsTimeSeries({ period });
 
-  return { summary, period };
+  return { summary, timeSeries, period };
 }
 
 export default function AdminAnalytics({ loaderData }: Route.ComponentProps) {
-  const { summary, period } = loaderData;
+  const { summary, timeSeries, period } = loaderData;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -132,58 +163,115 @@ export default function AdminAnalytics({ loaderData }: Route.ComponentProps) {
         )}
 
         {hasData && (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Revenue
-                </CardTitle>
-                <DollarSign className="size-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatPrice(summary.totalRevenue)}
-                </div>
-              </CardContent>
-            </Card>
+          <>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Revenue
+                  </CardTitle>
+                  <DollarSign className="size-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatPrice(summary.totalRevenue)}
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Enrollments
-                </CardTitle>
-                <Users className="size-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summary.totalEnrollments.toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Enrollments
+                  </CardTitle>
+                  <Users className="size-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {summary.totalEnrollments.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
 
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Top Earning Course
+                  </CardTitle>
+                  <Trophy className="size-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {summary.topEarningCourse ? (
+                    <>
+                      <div className="truncate text-2xl font-bold">
+                        {formatPrice(summary.topEarningCourse.revenue)}
+                      </div>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {summary.topEarningCourse.title}
+                      </p>
+                    </>
+                  ) : (
+                    <div className="text-2xl font-bold">N/A</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Revenue Over Time Chart */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Top Earning Course
-                </CardTitle>
-                <Trophy className="size-4 text-muted-foreground" />
+              <CardHeader>
+                <CardTitle>Revenue Over Time</CardTitle>
               </CardHeader>
               <CardContent>
-                {summary.topEarningCourse ? (
-                  <>
-                    <div className="truncate text-2xl font-bold">
-                      {formatPrice(summary.topEarningCourse.revenue)}
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {summary.topEarningCourse.title}
-                    </p>
-                  </>
+                {timeSeries.length === 0 ? (
+                  <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                    No revenue data for this period.
+                  </div>
                 ) : (
-                  <div className="text-2xl font-bold">N/A</div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={timeSeries.map((p) => ({
+                          date: formatChartDate(p.date),
+                          revenue: p.revenue,
+                        }))}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          className="stroke-border"
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 12 }}
+                          className="text-muted-foreground"
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          tickFormatter={formatChartRevenue}
+                          tick={{ fontSize: 12 }}
+                          className="text-muted-foreground"
+                          width={60}
+                        />
+                        <Tooltip
+                          formatter={(value) => [
+                            formatPrice(Number(value)),
+                            "Revenue",
+                          ]}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="revenue"
+                          strokeWidth={2}
+                          dot={false}
+                          className="stroke-primary"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
               </CardContent>
             </Card>
-          </div>
+          </>
         )}
       </div>
     </div>

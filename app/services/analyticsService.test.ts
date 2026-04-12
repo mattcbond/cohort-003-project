@@ -11,7 +11,7 @@ vi.mock("~/db", () => ({
   },
 }));
 
-import { getInstructorAnalytics, getAdminAnalyticsSummary } from "./analyticsService";
+import { getInstructorAnalytics, getAdminAnalyticsSummary, getAdminAnalyticsTimeSeries } from "./analyticsService";
 
 // Fixed "now" used across all tests for deterministic period calculations.
 // now = 2026-04-15T12:00:00.000Z
@@ -802,6 +802,148 @@ describe("analyticsService", () => {
       const result = getAdminAnalyticsSummary({ period: "7d" });
 
       expect(result.topEarningCourse).toBeNull();
+    });
+  });
+
+  // ─── Admin Analytics Time Series ───
+
+  describe("getAdminAnalyticsTimeSeries", () => {
+    it("returns empty array for all-time period with no purchases", () => {
+      const result = getAdminAnalyticsTimeSeries({ period: "all", now: NOW });
+      expect(result).toHaveLength(0);
+    });
+
+    it("uses daily buckets for 7d period", () => {
+      testDb
+        .insert(schema.purchases)
+        .values({
+          userId: base.user.id,
+          courseId: base.course.id,
+          pricePaid: 1000,
+          country: "US",
+          createdAt: "2026-04-10T00:00:00.000Z",
+        })
+        .run();
+
+      const result = getAdminAnalyticsTimeSeries({ period: "7d", now: NOW });
+
+      expect(result.length).toBeGreaterThanOrEqual(7);
+      expect(result[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it("uses monthly buckets for 12mo period", () => {
+      testDb
+        .insert(schema.purchases)
+        .values({
+          userId: base.user.id,
+          courseId: base.course.id,
+          pricePaid: 1000,
+          country: "US",
+          createdAt: "2026-01-15T00:00:00.000Z",
+        })
+        .run();
+
+      const result = getAdminAnalyticsTimeSeries({ period: "12mo", now: NOW });
+
+      expect(result.length).toBeGreaterThanOrEqual(12);
+      expect(result[0].date).toMatch(/^\d{4}-\d{2}$/);
+    });
+
+    it("aggregates revenue across all instructors", () => {
+      const otherInstructor = testDb
+        .insert(schema.users)
+        .values({
+          name: "Other Instructor",
+          email: "other2@example.com",
+          role: schema.UserRole.Instructor,
+        })
+        .returning()
+        .get();
+
+      const otherCourse = testDb
+        .insert(schema.courses)
+        .values({
+          title: "Other Course",
+          slug: "other-course-ts",
+          description: "Another course",
+          instructorId: otherInstructor.id,
+          categoryId: base.category.id,
+          status: schema.CourseStatus.Published,
+          price: 2999,
+        })
+        .returning()
+        .get();
+
+      testDb
+        .insert(schema.purchases)
+        .values([
+          {
+            userId: base.user.id,
+            courseId: base.course.id,
+            pricePaid: 4999,
+            country: "US",
+            createdAt: "2026-04-10T00:00:00.000Z",
+          },
+          {
+            userId: base.user.id,
+            courseId: otherCourse.id,
+            pricePaid: 2999,
+            country: "US",
+            createdAt: "2026-04-10T12:00:00.000Z",
+          },
+        ])
+        .run();
+
+      const result = getAdminAnalyticsTimeSeries({ period: "7d", now: NOW });
+
+      const apr10 = result.find((p) => p.date === "2026-04-10");
+      expect(apr10?.revenue).toBe(7998);
+    });
+
+    it("zero-fills days with no revenue", () => {
+      testDb
+        .insert(schema.purchases)
+        .values({
+          userId: base.user.id,
+          courseId: base.course.id,
+          pricePaid: 5000,
+          country: "US",
+          createdAt: "2026-04-10T00:00:00.000Z",
+        })
+        .run();
+
+      const result = getAdminAnalyticsTimeSeries({ period: "7d", now: NOW });
+
+      const apr09 = result.find((p) => p.date === "2026-04-09");
+      expect(apr09?.revenue).toBe(0);
+    });
+
+    it("uses monthly buckets for all-time period with purchases", () => {
+      testDb
+        .insert(schema.purchases)
+        .values([
+          {
+            userId: base.user.id,
+            courseId: base.course.id,
+            pricePaid: 1000,
+            country: "US",
+            createdAt: "2025-01-01T00:00:00.000Z",
+          },
+          {
+            userId: base.user.id,
+            courseId: base.course.id,
+            pricePaid: 2000,
+            country: "US",
+            createdAt: "2026-04-01T00:00:00.000Z",
+          },
+        ])
+        .run();
+
+      const result = getAdminAnalyticsTimeSeries({ period: "all", now: NOW });
+
+      expect(result[0].date).toMatch(/^\d{4}-\d{2}$/);
+      // 2025-01 to 2026-04 = 16 months
+      expect(result.length).toBe(16);
     });
   });
 });

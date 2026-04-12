@@ -288,3 +288,50 @@ export function getAdminAnalyticsSummary(opts: {
       : null,
   };
 }
+
+export function getAdminAnalyticsTimeSeries(opts: {
+  period: TimePeriod;
+  now?: Date;
+}): Array<{ date: string; revenue: number }> {
+  const { period, now = new Date() } = opts;
+  const periodStart = getPeriodStartIso(period, now);
+  const monthly = isMonthlyGranularity(period);
+
+  const purchaseRows = db
+    .select({ pricePaid: purchases.pricePaid, createdAt: purchases.createdAt })
+    .from(purchases)
+    .where(periodStart ? gte(purchases.createdAt, periodStart) : undefined)
+    .all();
+
+  if (period === "all" && purchaseRows.length === 0) {
+    return [];
+  }
+
+  let seriesStart: Date;
+  if (period === "all") {
+    const earliest = purchaseRows.reduce(
+      (min, p) => (p.createdAt < min ? p.createdAt : min),
+      purchaseRows[0].createdAt
+    );
+    seriesStart = new Date(earliest);
+  } else {
+    seriesStart = new Date(periodStart!);
+  }
+
+  const revenueByBucket = new Map<string, number>();
+  for (const p of purchaseRows) {
+    const key = monthly
+      ? p.createdAt.substring(0, 7)
+      : p.createdAt.substring(0, 10);
+    revenueByBucket.set(key, (revenueByBucket.get(key) ?? 0) + p.pricePaid);
+  }
+
+  const allBuckets = monthly
+    ? generateMonthlyBuckets(seriesStart, now)
+    : generateDailyBuckets(seriesStart, now);
+
+  return allBuckets.map((date) => ({
+    date,
+    revenue: revenueByBucket.get(date) ?? 0,
+  }));
+}
