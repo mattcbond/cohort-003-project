@@ -21,13 +21,48 @@ If the task has not already been planned, create a plan for it.
 
 **For backend code**: use red/green/refactor, one test at a time in a tracer-bullet style.
 
-1. Write a single failing test for the smallest vertical slice of behavior
-2. Run the test — confirm it fails (red)
-3. Write the minimum code to make it pass (green)
-4. Repeat from step 1 for the next slice of behavior
-5. Refactor if needed while keeping tests green
+**CRITICAL - What "Tracer Bullet Style" Means:**
 
-Each test should target one thin vertical slice through the system. Do not write all tests upfront — write one, make it pass, then move to the next.
+A tracer bullet is a VERTICAL SLICE through all layers, not a horizontal one.
+
+❌ **WRONG (Horizontal - Layer by Layer):**
+1. Write all database queries
+2. Write all service methods
+3. Write all route handlers
+4. Write all tests
+
+✅ **CORRECT (Vertical - Tracer Bullets):**
+1. ONE feature end-to-end: DB query + service method + route + test
+2. Next feature end-to-end: DB query + service method + route + test
+3. Next feature end-to-end: DB query + service method + route + test
+
+**The Red-Green-Refactor Loop (Per Tracer Bullet):**
+
+For each vertical slice:
+
+1. **Write ONE failing test** for the smallest vertical slice
+   - Example: "getUnreadNotifications returns notifications for the current user"
+   - Must touch: database → service → response
+   
+2. **Run the test** — confirm it fails (RED ❌)
+
+3. **Write minimum code** to make it pass (GREEN ✅)
+   - Implement ONLY: the DB query + service method needed for THIS test
+   - Do NOT implement other features yet
+   
+4. **Run the test again** — confirm it passes
+
+5. **Refactor if needed** (while keeping tests green)
+
+6. **Move to next vertical slice**
+   - Example: "markNotificationAsRead updates the read status"
+   - Repeat steps 1-5
+
+**DO NOT:**
+- ❌ Write all tests upfront
+- ❌ Build the entire service before testing
+- ❌ Skip running tests between slices
+- ❌ Code horizontally (all DB, then all services, then all routes)
 
 **For frontend code**: implement directly without TDD.
 
