@@ -11,7 +11,7 @@ vi.mock("~/db", () => ({
   },
 }));
 
-import { awardLessonXp, recordStreakActivity } from "./gamificationService";
+import { awardLessonXp, awardQuizXp, recordStreakActivity } from "./gamificationService";
 
 describe("gamificationService", () => {
   beforeEach(() => {
@@ -81,6 +81,45 @@ describe("gamificationService", () => {
       const rows = testDb.select().from(schema.streakActivities).all();
       expect(rows).toHaveLength(1);
       expect(rows[0].utcDate).toBe(todayUtc);
+    });
+  });
+
+  describe("awardQuizXp", () => {
+    it("inserts a 5 XP row for a first-pass quiz completion", () => {
+      awardQuizXp(base.user.id, 99);
+
+      const events = testDb.select().from(schema.xpEvents).all();
+      expect(events).toHaveLength(1);
+      expect(events[0].userId).toBe(base.user.id);
+      expect(events[0].amount).toBe(5);
+      expect(events[0].sourceType).toBe("quiz");
+      expect(events[0].sourceId).toBe(99);
+    });
+
+    it("is idempotent — awarding quiz XP twice inserts only one row", () => {
+      awardQuizXp(base.user.id, 99);
+      awardQuizXp(base.user.id, 99);
+
+      const events = testDb.select().from(schema.xpEvents).all();
+      expect(events).toHaveLength(1);
+    });
+
+    it("awards XP separately for different quizzes", () => {
+      awardQuizXp(base.user.id, 1);
+      awardQuizXp(base.user.id, 2);
+
+      const events = testDb.select().from(schema.xpEvents).all();
+      expect(events).toHaveLength(2);
+    });
+
+    it("does not interfere with lesson XP events", () => {
+      awardLessonXp(base.user.id, 10);
+      awardQuizXp(base.user.id, 10);
+
+      const events = testDb.select().from(schema.xpEvents).all();
+      expect(events).toHaveLength(2);
+      expect(events.find((e) => e.sourceType === "lesson")).toBeDefined();
+      expect(events.find((e) => e.sourceType === "quiz")).toBeDefined();
     });
   });
 });
