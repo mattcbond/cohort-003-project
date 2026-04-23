@@ -67,6 +67,51 @@ describe("progressService", () => {
     base = seedBaseData(testDb);
   });
 
+  describe("markLessonComplete — gamification side effects", () => {
+    it("awards 10 XP when a lesson is completed", () => {
+      const { lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 1);
+
+      markLessonComplete(base.user.id, lessons[0].id);
+
+      const events = testDb.select().from(schema.xpEvents).all();
+      expect(events).toHaveLength(1);
+      expect(events[0].amount).toBe(10);
+      expect(events[0].sourceType).toBe("lesson");
+      expect(events[0].sourceId).toBe(lessons[0].id);
+    });
+
+    it("does not award XP twice when a lesson is completed again", () => {
+      const { lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 1);
+
+      markLessonComplete(base.user.id, lessons[0].id);
+      markLessonComplete(base.user.id, lessons[0].id);
+
+      const events = testDb.select().from(schema.xpEvents).all();
+      expect(events).toHaveLength(1);
+    });
+
+    it("records a streak activity row for today's UTC date", () => {
+      const { lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 1);
+      const todayUtc = new Date().toISOString().slice(0, 10);
+
+      markLessonComplete(base.user.id, lessons[0].id);
+
+      const rows = testDb.select().from(schema.streakActivities).all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].utcDate).toBe(todayUtc);
+    });
+
+    it("records only one streak activity row when multiple lessons are completed on the same day", () => {
+      const { lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 2);
+
+      markLessonComplete(base.user.id, lessons[0].id);
+      markLessonComplete(base.user.id, lessons[1].id);
+
+      const rows = testDb.select().from(schema.streakActivities).all();
+      expect(rows).toHaveLength(1);
+    });
+  });
+
   describe("markLessonComplete", () => {
     it("marks a lesson as completed with a new progress record", () => {
       const { lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 1);
