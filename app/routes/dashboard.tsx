@@ -2,11 +2,12 @@ import { Link } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { getUserEnrolledCourses } from "~/services/enrollmentService";
 import { calculateProgress, getCompletedLessonCount, getTotalLessonCount, getNextIncompleteLesson } from "~/services/progressService";
+import { getGamificationStats } from "~/services/gamificationService";
 import { getCurrentUserId } from "~/lib/session";
 import { Card, CardContent, CardFooter, CardHeader } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
-import { AlertTriangle, BookOpen, CheckCircle2, GraduationCap, PlayCircle } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Flame, GraduationCap, PlayCircle, Star } from "lucide-react";
 import { CourseImage } from "~/components/course-image";
 import { data, isRouteErrorResponse } from "react-router";
 
@@ -59,7 +60,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const completedCourses = coursesWithProgress.filter((c) => c.isCompleted);
   const inProgressCourses = coursesWithProgress.filter((c) => !c.isCompleted);
 
-  return { inProgressCourses, completedCourses };
+  const gamificationStats = getGamificationStats(currentUserId);
+
+  return { inProgressCourses, completedCourses, gamificationStats };
 }
 
 function DashboardCardSkeleton() {
@@ -102,7 +105,7 @@ export function HydrateFallback() {
 }
 
 export default function Dashboard({ loaderData }: Route.ComponentProps) {
-  const { inProgressCourses, completedCourses } = loaderData;
+  const { inProgressCourses, completedCourses, gamificationStats } = loaderData;
   const totalCourses = inProgressCourses.length + completedCourses.length;
 
   return (
@@ -121,6 +124,63 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
         <p className="mt-1 text-muted-foreground">
           Track your learning progress
         </p>
+      </div>
+
+      {/* Gamification summary */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        {/* Level + XP */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Star className="size-4 text-primary" />
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Level {gamificationStats.level}
+              </span>
+            </div>
+            <div className="mb-1 flex items-center justify-between text-sm">
+              <span className="font-medium">{gamificationStats.totalXp} XP total</span>
+              <span className="text-muted-foreground">
+                {gamificationStats.currentLevelXp} / {gamificationStats.nextLevelXp}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{
+                  width: `${Math.min(100, Math.round((gamificationStats.currentLevelXp / gamificationStats.nextLevelXp) * 100))}%`,
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Current streak */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Flame className="size-4 text-orange-500" />
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Current Streak
+              </span>
+            </div>
+            <p className="text-3xl font-bold">{gamificationStats.currentStreak}</p>
+            <p className="mt-1 text-sm text-muted-foreground">days</p>
+          </CardContent>
+        </Card>
+
+        {/* Longest streak */}
+        <Card>
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Flame className="size-4 text-muted-foreground" />
+              <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Best Streak
+              </span>
+            </div>
+            <p className="text-3xl font-bold">{gamificationStats.longestStreak}</p>
+            <p className="mt-1 text-sm text-muted-foreground">days</p>
+          </CardContent>
+        </Card>
       </div>
 
       {totalCourses === 0 ? (

@@ -266,6 +266,35 @@ export function getNextIncompleteLesson(userId: number, courseId: number) {
   return null;
 }
 
+export function getModuleLessonCount(moduleId: number): number {
+  const result = db
+    .select({ count: sql<number>`count(*)` })
+    .from(lessons)
+    .where(eq(lessons.moduleId, moduleId))
+    .get();
+  return result?.count ?? 0;
+}
+
+export function isModuleComplete(userId: number, moduleId: number): boolean {
+  const total = getModuleLessonCount(moduleId);
+  if (total === 0) return false;
+
+  const completed = db
+    .select({ count: sql<number>`count(*)` })
+    .from(lessonProgress)
+    .innerJoin(lessons, eq(lessonProgress.lessonId, lessons.id))
+    .where(
+      and(
+        eq(lessonProgress.userId, userId),
+        eq(lessons.moduleId, moduleId),
+        eq(lessonProgress.status, LessonProgressStatus.Completed)
+      )
+    )
+    .get();
+
+  return (completed?.count ?? 0) >= total;
+}
+
 export function getRecentlyProgressedCourses(
   userId: number,
   limit: number = 3

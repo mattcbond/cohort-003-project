@@ -23,6 +23,8 @@ import {
   getTotalLessonCount,
   isLessonCompleted,
   getNextIncompleteLesson,
+  isModuleComplete,
+  getModuleLessonCount,
 } from "./progressService";
 
 // Helper to create a module with lessons in the test db
@@ -526,6 +528,52 @@ describe("progressService", () => {
       const next = getNextIncompleteLesson(base.user.id, base.course.id);
       expect(next).toBeDefined();
       expect(next!.id).toBe(lessons[0].id);
+    });
+  });
+
+  describe("isModuleComplete", () => {
+    it("returns false when no lessons are completed", () => {
+      const { module: mod } = createModuleWithLessons(base.course.id, "Module 1", 1, 2);
+      expect(isModuleComplete(base.user.id, mod.id)).toBe(false);
+    });
+
+    it("returns false when only some lessons are completed", () => {
+      const { module: mod, lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 3);
+      markLessonComplete(base.user.id, lessons[0].id);
+      expect(isModuleComplete(base.user.id, mod.id)).toBe(false);
+    });
+
+    it("returns true when all lessons in the module are completed", () => {
+      const { module: mod, lessons } = createModuleWithLessons(base.course.id, "Module 1", 1, 2);
+      for (const lesson of lessons) {
+        markLessonComplete(base.user.id, lesson.id);
+      }
+      expect(isModuleComplete(base.user.id, mod.id)).toBe(true);
+    });
+
+    it("returns false for a module with no lessons", () => {
+      const mod = testDb
+        .insert(schema.modules)
+        .values({ courseId: base.course.id, title: "Empty Module", position: 1 })
+        .returning()
+        .get();
+      expect(isModuleComplete(base.user.id, mod.id)).toBe(false);
+    });
+  });
+
+  describe("getModuleLessonCount", () => {
+    it("returns the number of lessons in a module", () => {
+      const { module: mod } = createModuleWithLessons(base.course.id, "Module 1", 1, 4);
+      expect(getModuleLessonCount(mod.id)).toBe(4);
+    });
+
+    it("returns 0 for a module with no lessons", () => {
+      const mod = testDb
+        .insert(schema.modules)
+        .values({ courseId: base.course.id, title: "Empty Module", position: 1 })
+        .returning()
+        .get();
+      expect(getModuleLessonCount(mod.id)).toBe(0);
     });
   });
 });

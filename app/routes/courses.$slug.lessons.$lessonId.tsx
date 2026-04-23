@@ -15,6 +15,8 @@ import {
   getLessonProgressForCourse,
   markLessonComplete,
   markLessonInProgress,
+  isModuleComplete,
+  getModuleLessonCount,
 } from "~/services/progressService";
 import {
   getLastWatchPosition,
@@ -392,7 +394,20 @@ export async function action({ params, request }: Route.ActionArgs) {
   const intent = formData.get("intent");
 
   if (intent === "mark-complete") {
+    const lesson = getLessonById(lessonId);
     markLessonComplete(currentUserId, lessonId);
+
+    if (lesson && isModuleComplete(currentUserId, lesson.moduleId)) {
+      const mod = getModuleById(lesson.moduleId);
+      const lessonCount = getModuleLessonCount(lesson.moduleId);
+      return {
+        success: true,
+        moduleCompleted: true,
+        moduleTitle: mod?.title ?? "Module",
+        moduleXp: lessonCount * 10,
+      };
+    }
+
     return { success: true };
   }
 
@@ -553,6 +568,16 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
       navigate(`/courses/${course.slug}/lessons/${nextLesson.id}`);
     }
   }, [justCompleted, nextLesson, course.slug, navigate]);
+
+  // Module completion toast
+  useEffect(() => {
+    if (fetcher.data?.moduleCompleted) {
+      toast.success(
+        `Module complete! +${fetcher.data.moduleXp} XP earned`,
+        { description: fetcher.data.moduleTitle }
+      );
+    }
+  }, [fetcher.data]);
 
   const quizResult = quizFetcher.data?.quizResult ?? null;
   const isSubmittingQuiz = quizFetcher.state !== "idle";
