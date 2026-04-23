@@ -52,10 +52,9 @@ export async function loader({ request }: Route.LoaderArgs) {
       })
     : [];
 
-  const gamificationStats =
-    currentUserId && currentUser?.role === UserRole.Student
-      ? getGamificationStats(currentUserId)
-      : null;
+  const gamificationStats = currentUserId
+    ? getGamificationStats(currentUserId)
+    : null;
 
   const isInstructor = currentUser?.role === UserRole.Instructor;
   const userIsTeamAdmin = currentUserId ? isTeamAdmin(currentUserId) : false;

@@ -244,7 +244,7 @@ export function Sidebar({
         </div>
       )}
 
-      {gamificationStats && (
+      {gamificationStats && currentUser?.role === UserRole.Student && (
         <div className="border-t border-sidebar-border p-3 space-y-3">
           <div className="px-3">
             <div className="flex items-center justify-between mb-1">
