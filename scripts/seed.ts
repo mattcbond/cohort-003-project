@@ -45,6 +45,10 @@ async function seed() {
 
   // Drop and recreate tables for a clean seed
   sqlite.exec(`
+    DROP TABLE IF EXISTS xp_events;
+    DROP TABLE IF EXISTS streak_activities;
+    DROP TABLE IF EXISTS notifications;
+    DROP TABLE IF EXISTS lesson_bookmarks;
     DROP TABLE IF EXISTS video_watch_events;
     DROP TABLE IF EXISTS lesson_comments;
     DROP TABLE IF EXISTS quiz_answers;
@@ -1421,6 +1425,10 @@ You've completed the Building REST APIs course. You now have the skills to build
         completedAt: daysAgo(daysAgoCompleted),
       })
       .run();
+    db.insert(schema.xpEvents)
+      .values({ userId, amount: 10, sourceType: "lesson", sourceId: lessonId })
+      .onConflictDoNothing()
+      .run();
   }
 
   function markInProgress(userId: number, lessonId: number) {
@@ -1522,6 +1530,13 @@ You've completed the Building REST APIs course. You now have the skills to build
           questionId: qId,
           selectedOptionId: selectedOption.optionId,
         })
+        .run();
+    }
+
+    if (passed) {
+      db.insert(schema.xpEvents)
+        .values({ userId, amount: 5, sourceType: "quiz", sourceId: quizId })
+        .onConflictDoNothing()
         .run();
     }
   }
