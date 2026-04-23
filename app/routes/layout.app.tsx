@@ -17,6 +17,7 @@ import {
   getNotifications,
   getUnreadCount,
 } from "~/services/notificationService";
+import { getGamificationStats } from "~/services/gamificationService";
 import { UserRole } from "~/db/schema";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -51,6 +52,11 @@ export async function loader({ request }: Route.LoaderArgs) {
       })
     : [];
 
+  const gamificationStats =
+    currentUserId && currentUser?.role === UserRole.Student
+      ? getGamificationStats(currentUserId)
+      : null;
+
   const isInstructor = currentUser?.role === UserRole.Instructor;
   const userIsTeamAdmin = currentUserId ? isTeamAdmin(currentUserId) : false;
   const showNotifications = (isInstructor || userIsTeamAdmin) && currentUserId;
@@ -78,6 +84,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     isTeamAdmin: userIsTeamAdmin,
     notifications,
     notificationUnreadCount,
+    gamificationStats,
   };
 }
 
@@ -92,6 +99,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     isTeamAdmin: userIsTeamAdmin,
     notifications,
     notificationUnreadCount,
+    gamificationStats,
   } = loaderData;
 
   return (
@@ -102,6 +110,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
         isTeamAdmin={userIsTeamAdmin}
         notifications={notifications}
         notificationUnreadCount={notificationUnreadCount}
+        gamificationStats={gamificationStats}
       />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
