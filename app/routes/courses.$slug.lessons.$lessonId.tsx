@@ -868,11 +868,21 @@ function CurriculumSidebar({
   )?.id;
 
   const [expandedModules, setExpandedModules] = useState<Set<number>>(() => {
-    // Start with current module expanded
     const initial = new Set<number>();
     if (currentModuleId) initial.add(currentModuleId);
     return initial;
   });
+
+  useEffect(() => {
+    if (currentModuleId) {
+      setExpandedModules((prev) => {
+        if (prev.has(currentModuleId)) return prev;
+        const next = new Set(prev);
+        next.add(currentModuleId);
+        return next;
+      });
+    }
+  }, [currentModuleId]);
 
   function toggleModule(moduleId: number) {
     setExpandedModules((prev) => {

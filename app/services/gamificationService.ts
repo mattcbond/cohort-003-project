@@ -5,14 +5,14 @@ import { computeLevel } from "~/lib/leveling";
 
 export function awardLessonXp(userId: number, lessonId: number) {
   db.insert(xpEvents)
-    .values({ userId, amount: 10, sourceType: "lesson", sourceId: lessonId })
+    .values({ userId, amount: 10, sourceType: "lesson_complete", sourceId: lessonId })
     .onConflictDoNothing()
     .run();
 }
 
 export function awardQuizXp(userId: number, quizId: number) {
   db.insert(xpEvents)
-    .values({ userId, amount: 5, sourceType: "quiz", sourceId: quizId })
+    .values({ userId, amount: 5, sourceType: "quiz_pass", sourceId: quizId })
     .onConflictDoNothing()
     .run();
 }

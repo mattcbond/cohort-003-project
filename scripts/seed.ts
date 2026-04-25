@@ -1426,7 +1426,7 @@ You've completed the Building REST APIs course. You now have the skills to build
       })
       .run();
     db.insert(schema.xpEvents)
-      .values({ userId, amount: 10, sourceType: "lesson", sourceId: lessonId })
+      .values({ userId, amount: 10, sourceType: "lesson_complete", sourceId: lessonId })
       .onConflictDoNothing()
       .run();
   }
@@ -1535,7 +1535,7 @@ You've completed the Building REST APIs course. You now have the skills to build
 
     if (passed) {
       db.insert(schema.xpEvents)
-        .values({ userId, amount: 5, sourceType: "quiz", sourceId: quizId })
+        .values({ userId, amount: 5, sourceType: "quiz_pass", sourceId: quizId })
         .onConflictDoNothing()
         .run();
     }
