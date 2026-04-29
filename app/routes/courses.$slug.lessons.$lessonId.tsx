@@ -6,16 +6,14 @@ import {
   getCourseBySlug,
   getCourseWithDetails,
 } from "~/services/courseService";
-import { getLessonById, getLessonsByModule } from "~/services/lessonService";
+import { getLessonById } from "~/services/lessonService";
 import { getModuleById } from "~/services/moduleService";
 import { getCurrentUserId } from "~/lib/session";
 import { isUserEnrolled } from "~/services/enrollmentService";
 import {
   getLessonProgress,
   getLessonProgressForCourse,
-  markLessonComplete,
   markLessonInProgress,
-  isLessonCompleted,
 } from "~/services/progressService";
 import {
   getLastWatchPosition,
@@ -74,7 +72,7 @@ import {
   toggleBookmark,
 } from "~/services/bookmarkService";
 import { awardXp } from "~/services/xpService";
-import { recordStreakActivity } from "~/services/streakService";
+import { completeLessonForStudent } from "~/services/lessonCompletionService";
 
 const lessonParamsSchema = v.object({
   slug: v.pipe(v.string(), v.minLength(1)),
@@ -395,28 +393,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   const intent = formData.get("intent");
 
   if (intent === "mark-complete") {
-    markLessonComplete(currentUserId, lessonId);
-    awardXp(currentUserId, 10, "lesson_complete", lessonId);
-    recordStreakActivity(currentUserId);
-
-    // Check if this completes the module
-    const lesson = getLessonById(lessonId);
-    let moduleComplete: { moduleTitle: string; totalXp: number } | null = null;
-    if (lesson) {
-      const moduleLessons = getLessonsByModule(lesson.moduleId);
-      const allComplete = moduleLessons.every(
-        (l) => l.id === lessonId || isLessonCompleted(currentUserId, l.id)
-      );
-      if (allComplete) {
-        const moduleRecord = getModuleById(lesson.moduleId);
-        moduleComplete = {
-          moduleTitle: moduleRecord?.title ?? "Module",
-          totalXp: moduleLessons.length * 10,
-        };
-      }
-    }
-
-    return { success: true, moduleComplete };
+    const result = completeLessonForStudent(currentUserId, lessonId, { idempotent: true });
+    return { success: true, moduleComplete: result.moduleCompletion };
   }
 
   if (intent === "toggle-bookmark") {
